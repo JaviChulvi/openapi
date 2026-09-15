@@ -599,15 +599,17 @@ function apiClientSource(async: boolean): string {
         base_url: str,
         timeout: float | httpx.Timeout,
         max_retries: int,
+        retry_methods: Sequence[str],
         http_client: httpx.${async ? "Async" : ""}Client | None,
     ) -> None:
         self._client = http_client or httpx.${async ? "Async" : ""}Client(timeout=timeout)
         self._base_url = httpx.URL(f"{base_url.rstrip('/')}/")
         self._api_key = api_key
         self._max_retries = max_retries
+        self._retry_methods = {method.upper() for method in retry_methods}
 
     ${a}def request(self, method: str, path: str, **kwargs: Any) -> Any:
-        retryable = method.upper() in {"GET", "HEAD", "OPTIONS"}
+        retryable = method.upper() in self._retry_methods
         headers = {**_without_none(kwargs.get("headers") or {}), **(kwargs.get("extra_headers") or {})}
         if self._api_key and (auth := kwargs.get("auth")):
             headers.setdefault(auth[0], f"{auth[1]}{self._api_key}")
@@ -632,7 +634,11 @@ function apiClientSource(async: boolean): string {
                     raise APIConnectionError(str(error)) from error
                 ${w}${async ? "asyncio" : "time"}.sleep(_retry_delay(None, attempt))
                 continue
-            if (retryable or (response.status_code == 429 and kwargs.get("json") is not None)) and attempt < self._max_retries and (response.status_code in {408, 409, 429} or response.status_code >= 500):
+            if (
+                (retryable or (response.status_code == 429 and kwargs.get("json") is not None))
+                and attempt < self._max_retries
+                and (response.status_code in {408, 409, 429} or response.status_code >= 500)
+            ):
                 ${w}${async ? "asyncio" : "time"}.sleep(_retry_delay(response, attempt))
                 continue
             if response.is_error:
@@ -812,7 +818,7 @@ function publicClientSource(
   const enter = async
     ? `    async def __aenter__(self) -> ${className}:  # noqa: PYI034\n        return self\n\n    async def __aexit__(\n        self,\n        exc_type: type[BaseException] | None,\n        exc: BaseException | None,\n        traceback: object,\n    ) -> None:\n        await self.close()`
     : `    def __enter__(self) -> ${className}:  # noqa: PYI034\n        return self\n\n    def __exit__(\n        self,\n        exc_type: type[BaseException] | None,\n        exc: BaseException | None,\n        traceback: object,\n    ) -> None:\n        self.close()`;
-  return `from __future__ import annotations\n\nimport httpx\n\nfrom ._client import ${apiClient}, _resolve_api_key\nfrom .resources import (\n${imports.map((name) => `    ${name},`).join("\n")}\n)\n\n\nclass ${className}:\n    """Client for the ${pythonDocstringText(config.name, "    ")}."""\n\n    def __init__(\n        self,\n        *,\n        api_key: str | None = None,\n        base_url: str = "${baseUrl}",\n        timeout: float | httpx.Timeout = 60.0,\n        max_retries: int = 2,\n        http_client: ${httpClient} | None = None,\n    ) -> None:\n        """Initialize the client.\n\n        Args:\n            api_key (str, optional): API key. Defaults to ${pythonDocstringText(config.apiKey.environment, "            ")}${config.python.authProvider ? " then the configured credential provider" : ""}. Pass an empty string to disable authentication.\n            base_url (str): API base URL.\n            timeout (float | httpx.Timeout): Request timeout.\n            max_retries (int): Retries for connection errors and retryable responses.\n            http_client (${httpClient}, optional): Custom HTTP client.\n        """\n        resolved_api_key = _resolve_api_key(api_key)\n        self._client = ${apiClient}(\n            api_key=resolved_api_key,\n            base_url=base_url,\n            timeout=timeout,\n            max_retries=max_retries,\n            http_client=http_client,\n        )\n${properties}\n\n    ${async ? "async " : ""}def close(self) -> None:\n        """Close the underlying HTTP client."""\n        ${async ? "await " : ""}self._client.close()\n\n${enter}\n`;
+  return `from __future__ import annotations\n\nfrom collections.abc import Sequence\n\nimport httpx\n\nfrom ._client import ${apiClient}, _resolve_api_key\nfrom .resources import (\n${imports.map((name) => `    ${name},`).join("\n")}\n)\n\n\nclass ${className}:\n    """Client for the ${pythonDocstringText(config.name, "    ")}."""\n\n    def __init__(\n        self,\n        *,\n        api_key: str | None = None,\n        base_url: str = "${baseUrl}",\n        timeout: float | httpx.Timeout = 60.0,\n        max_retries: int = 2,\n        retry_methods: Sequence[str] = ("GET", "HEAD", "OPTIONS"),\n        http_client: ${httpClient} | None = None,\n    ) -> None:\n        """Initialize the client.\n\n        Args:\n            api_key (str, optional): API key. Defaults to ${pythonDocstringText(config.apiKey.environment, "            ")}${config.python.authProvider ? " then the configured credential provider" : ""}. Pass an empty string to disable authentication.\n            base_url (str): API base URL.\n            timeout (float | httpx.Timeout): Request timeout.\n            max_retries (int): Retries for connection errors and retryable responses.\n            retry_methods (Sequence[str]): HTTP methods safe to repeat after network errors or HTTP 408, 409, 429, and 5xx responses. Defaults to GET, HEAD, OPTIONS. Opt in only when the operation is safe to repeat and its request body can be resent.\n            http_client (${httpClient}, optional): Custom HTTP client.\n        """\n        resolved_api_key = _resolve_api_key(api_key)\n        self._client = ${apiClient}(\n            api_key=resolved_api_key,\n            base_url=base_url,\n            timeout=timeout,\n            max_retries=max_retries,\n            retry_methods=retry_methods,\n            http_client=http_client,\n        )\n${properties}\n\n    ${async ? "async " : ""}def close(self) -> None:\n        """Close the underlying HTTP client."""\n        ${async ? "await " : ""}self._client.close()\n\n${enter}\n`;
 }
 
 export async function generatePython(

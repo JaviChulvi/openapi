@@ -85,6 +85,8 @@ client = AsyncExample()
 widgets = await client.widgets.list()
 ```
 
+Both clients accept `max_retries` (default 2) and `retry_methods` (default GET, HEAD, OPTIONS). Set `retry_methods=("POST",)` only on a client used for writes that are safe to repeat. Network failures and HTTP 408, 409, 429, and 5xx responses use the existing retry loop; ordinary JSON requests retain their HTTP 429 retries. Opt in only when the request body can also be resent. This setting does not provide server-side idempotency.
+
 Resources come from each operation's first tag and method names from the path: the static segment after the resource (`client.deployments.health()`, `client.explore.search()`) or `list`/`retrieve`/`create`/`update`/`delete` when there is none. Set `x-sdk-method` (a lowercase Python identifier, unique per resource) on an operation to choose a name explicitly; product-specific example values belong in the contract's `example` fields. The generated package includes typed resources and `TypedDict` responses, multipart uploads, retries for temporary failures, and structured API errors. It requires Python 3.11 or newer. Generated packages default to AGPL-3.0; set `license.id` and `license.file` to use another license.
 
 ## 🧩 One Contract, Multiple Outputs

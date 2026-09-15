@@ -1224,7 +1224,7 @@ describe("Python generator", () => {
     expect(runtime).toContain('os.environ.get("EXAMPLE_API_KEY")');
     expect(runtime).not.toContain('headers={"Authorization": f"Bearer {api_key}"} if api_key else {}');
     expect(runtime).toContain('path.lstrip("/")');
-    expect(runtime).toContain('retryable = method.upper() in {"GET", "HEAD", "OPTIONS"}');
+    expect(runtime).toContain("retryable = method.upper() in self._retry_methods");
     expect(runtime).toContain(
       'headers = {**_without_none(kwargs.get("headers") or {}), **(kwargs.get("extra_headers") or {})}',
     );
