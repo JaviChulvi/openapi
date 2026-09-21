@@ -36,6 +36,17 @@ This repository is a standalone, general-purpose OpenAPI-to-SDK and API document
 - Keep consumer customizations reproducible through generation and synchronization. Never hand-edit generated output or make the converter depend on a consumer repository.
 - Review every change against this boundary. Relocate application-specific work to its owner instead of teaching the converter about one application.
 
+## Platform API and SDK release version (CRITICAL)
+
+**The upstream Platform API contract's `info.version` owns the `ultralytics-platform` SDK release version. The SDK version MUST equal its API contract version.** The SDK repository consumes the deployed contract through automation; it does not choose release versions.
+
+- Keep public documentation and PR text scoped to the public upstream API contract. Do not include private repository names, internal paths, or private PR links.
+- NEVER set Platform SDK `python.version`, independently bump its patch, or hand-edit generated versions. API `0.1.50` with SDK `0.1.52` is INVALID; `max(API, SDK)` and automatic SDK patch bumps do not coordinate releases.
+- SDK-only CLI/help/auth fixes and generator improvements follow the same sequence: merge the source fix, coordinate a contract version bump and deployment with the Platform API maintainers, then let SDK automation synchronize and publish that version. Verify the live contract and published wheel's required behavior before updating a consumer dependency.
+- If the SDK is already published ahead of the API, the API maintainers must advance the upstream contract beyond every published SDK version and synchronize. Never downgrade, reuse a published version, or claim the offset will self-heal. Read the SDK's `AGENTS.md` before coordinating a release.
+
+This is the Ultralytics Platform consumer release policy; keep it out of the general-purpose converter and preserve version configuration for third-party APIs.
+
 ## Commands and validation
 
 ```bash
