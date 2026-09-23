@@ -210,8 +210,11 @@ function objectVariants(document: OpenApiDocument, input: JsonSchema | undefined
     const variant = objectSchema(document, item);
     const keys = Object.entries(variant?.properties ?? {})
       .filter(([, property]) => {
-        const forbidden = resolveSchema(document, property)?.not;
-        return !forbidden || Object.keys(forbidden).length > 0; // `not: {}` forbids the key in this variant
+        const negated = resolveSchema(document, property)?.not;
+        const matchesAll =
+          negated === true ||
+          (typeof negated === "object" && !Object.keys(resolveSchema(document, negated) ?? {}).length);
+        return !matchesAll; // `not: true` or `not: {}` forbids the key in this variant
       })
       .map(([key, property]) => {
         const values = literalValues(document, property);
