@@ -204,10 +204,11 @@ function prepare(document: OpenApiDocument): Map<string, PythonOperation[]> {
 }
 
 function objectVariants(document: OpenApiDocument, input: JsonSchema | undefined, name: string): string {
-  const variants = objectUnion(document, resolveSchema(document, input));
+  const schema = resolveSchema(document, input);
+  const variants = objectUnion(document, schema);
   if (!variants) return "";
   const shapes = variants.map((item) => {
-    const variant = objectSchema(document, item);
+    const variant = objectSchema(document, { allOf: [{ ...schema, oneOf: undefined, anyOf: undefined }, item] });
     const keys = Object.entries(variant?.properties ?? {})
       .filter(([, property]) => {
         const negated = resolveSchema(document, property)?.not;
